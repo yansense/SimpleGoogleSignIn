@@ -126,7 +126,10 @@ public class SimpleGoogleSignIn: NSObject {
         let codeVerifier = generateCodeVerifier()
         let codeChallenge = generateCodeChallenge(from: codeVerifier)
         let state = UUID().uuidString
-        let usedNonce = nonce ?? UUID().uuidString
+        let originalNonce = nonce ?? UUID().uuidString
+        
+        // Hash the nonce using SHA256 for OIDC compliance
+        let hashedNonce = sha256(originalNonce)
         
         // Build authorization URL
         var components = URLComponents(string: "https://accounts.google.com/o/oauth2/v2/auth")!
@@ -138,7 +141,7 @@ public class SimpleGoogleSignIn: NSObject {
             URLQueryItem(name: "code_challenge", value: codeChallenge),
             URLQueryItem(name: "code_challenge_method", value: "S256"),
             URLQueryItem(name: "state", value: state),
-            URLQueryItem(name: "nonce", value: usedNonce),
+            URLQueryItem(name: "nonce", value: hashedNonce),
             URLQueryItem(name: "include_granted_scopes", value: "true"),
             URLQueryItem(name: "access_type", value: "offline")
         ]
@@ -166,7 +169,7 @@ public class SimpleGoogleSignIn: NSObject {
                 error: error,
                 codeVerifier: codeVerifier,
                 expectedState: state,
-                expectedNonce: usedNonce
+                expectedNonce: originalNonce
             )
         }
         
@@ -574,4 +577,12 @@ private extension Data {
             .replacingOccurrences(of: "/", with: "_")
             .replacingOccurrences(of: "=", with: "")
     }
+}
+
+// MARK: - Helper Functions
+
+private func sha256(_ input: String) -> String {
+    let inputData = Data(input.utf8)
+    let hashedData = SHA256.hash(data: inputData)
+    return hashedData.compactMap { String(format: "%02x", $0) }.joined()
 }
