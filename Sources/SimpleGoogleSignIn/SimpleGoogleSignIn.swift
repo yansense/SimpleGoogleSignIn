@@ -71,6 +71,7 @@ public struct GoogleSignInResult {
     public let accessToken: GoogleToken
     public let refreshToken: String?
     public let grantedScopes: [String]?
+    public let nonce: String?
 }
 
 // MARK: - Main Sign In Class
@@ -104,6 +105,7 @@ public class SimpleGoogleSignIn: NSObject {
     public func signIn(
         presentingViewController: UIViewController,
         hint: String? = nil,
+        nonce: String? = nil,
         scopes: [String],
         completion: @escaping (Result<GoogleSignInResult, Error>) -> Void
     ) {
@@ -124,7 +126,7 @@ public class SimpleGoogleSignIn: NSObject {
         let codeVerifier = generateCodeVerifier()
         let codeChallenge = generateCodeChallenge(from: codeVerifier)
         let state = UUID().uuidString
-        let nonce = UUID().uuidString
+        let usedNonce = nonce ?? UUID().uuidString
         
         // Build authorization URL
         var components = URLComponents(string: "https://accounts.google.com/o/oauth2/v2/auth")!
@@ -136,7 +138,7 @@ public class SimpleGoogleSignIn: NSObject {
             URLQueryItem(name: "code_challenge", value: codeChallenge),
             URLQueryItem(name: "code_challenge_method", value: "S256"),
             URLQueryItem(name: "state", value: state),
-            URLQueryItem(name: "nonce", value: nonce),
+            URLQueryItem(name: "nonce", value: usedNonce),
             URLQueryItem(name: "include_granted_scopes", value: "true"),
             URLQueryItem(name: "access_type", value: "offline")
         ]
@@ -164,7 +166,7 @@ public class SimpleGoogleSignIn: NSObject {
                 error: error,
                 codeVerifier: codeVerifier,
                 expectedState: state,
-                expectedNonce: nonce
+                expectedNonce: usedNonce
             )
         }
         
@@ -206,7 +208,8 @@ public class SimpleGoogleSignIn: NSObject {
                     openIdToken: response.openIdToken?.tokenString ?? "",
                     accessToken: response.accessToken,
                     refreshToken: response.refreshToken ?? refreshToken,
-                    grantedScopes: response.scope?.components(separatedBy: " ") ?? []
+                    grantedScopes: response.scope?.components(separatedBy: " ") ?? [],
+                    nonce: nil  // refresh token 不需要 nonce
                 )
 
                 DispatchQueue.main.async {
@@ -373,7 +376,8 @@ public class SimpleGoogleSignIn: NSObject {
             openIdToken: response.openIdToken?.tokenString ?? "",
             accessToken: response.accessToken,
             refreshToken: response.refreshToken,
-            grantedScopes: response.scope?.components(separatedBy: " ") ?? []
+            grantedScopes: response.scope?.components(separatedBy: " ") ?? [],
+            nonce: expectedNonce
         )
         
         DispatchQueue.main.async { [weak self] in
